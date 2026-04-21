@@ -1,0 +1,6 @@
+.env
+newsletter_db.sqlite
+newsletters/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaSheet — Trading Intelligence</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f0f0f;
+      --surface:   #1a1a1a;
+      --surface2:  #222222;
+      --border:    #2a2a2a;
+      --gold:      #c8a96e;
+      --gold-dim:  #8a6f3e;
+      --green:     #4caf7d;
+      --red:       #e05c5c;
+      --yellow:    #d4a837;
+      --blue:      #5b8dd9;
+      --purple:    #a05bd9;
+      --orange:    #d9845b;
+      --text:      #e8e8e8;
+      --muted:     #888;
+      --sidebar-w: 220px;
+      --mono:      'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 22px 16px;
+      gap: 20px;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 10;
+    }
+
+    .logo { display: flex; flex-direction: column; gap: 3px; }
+    .logo-title {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .logo-sub { font-size: 11px; color: var(--muted); }
+
+    .sidebar-divider { height: 1px; background: var(--border); }
+
+    .nav-tabs { display: flex; gap: 6px; }
+    .nav-tab {
+      flex: 1;
+      padding: 7px 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .nav-tab:hover { color: var(--text); border-color: var(--gold-dim); }
+    .nav-tab.active { background: transparent; border-color: var(--gold); color: var(--gold); }
+
+    /* Index ticker list */
+    .index-list { display: flex; flex-direction: column; gap: 5px; }
+    .sidebar-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .index-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 8px;
+      background: var(--surface2);
+      border-radius: 5px;
+      font-size: 11px;
+    }
+    .index-name { color: var(--muted); font-family: var(--mono); }
+    .index-change { font-family: var(--mono); font-weight: 600; }
+    .index-change.pos { color: var(--green); }
+    .index-change.neg { color: var(--red); }
+    .index-change.flat { color: var(--muted); }
+
+    .sidebar-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+
+    #generate-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--gold);
+      border: none;
+      border-radius: 8px;
+      color: #0f0f0f;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: opacity 0.15s;
+    }
+    #generate-btn:hover { opacity: 0.88; }
+    #generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #status-bar {
+      padding: 8px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
+    .status-dot.running { background: var(--gold); animation: pulse 1s infinite; }
+    .status-dot.done    { background: var(--green); }
+    .status-dot.error   { background: var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Main ────────────────────────────────────────────────── */
+    #main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 28px 32px;
+      max-width: 900px;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Newsletter header ────────────────────────────────────── */
+    .newsletter-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .newsletter-meta { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+    .sentiment-badge {
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .sentiment-badge.BULLISH { background:rgba(76,175,125,0.15); color:var(--green); border:1px solid rgba(76,175,125,0.3); }
+    .sentiment-badge.BEARISH { background:rgba(224,92,92,0.15);  color:var(--red);   border:1px solid rgba(224,92,92,0.3); }
+    .sentiment-badge.NEUTRAL { background:rgba(212,168,55,0.15); color:var(--yellow);border:1px solid rgba(212,168,55,0.3); }
+
+    /* ── Section cards ────────────────────────────────────────── */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      border-left: 4px solid var(--gold-dim);
+    }
+    .section-card.macro     { border-left-color: var(--blue); }
+    .section-card.catalyst  { border-left-color: var(--orange); }
+    .section-card.trades    { border-left-color: var(--green); }
+    .section-card.snapshots { border-left-color: var(--purple); }
+    .section-card.contra    { border-left-color: var(--yellow); }
+    .section-card.scorecard { border-left-color: var(--gold); }
+
+    .section-tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .section-content h2 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    .section-content h3 { font-size: 13px; font-weight: 600; color: var(--gold); margin: 14px 0 6px; }
+    .section-content p  { margin-bottom: 8px; color: #ccc; font-size: 13.5px; }
+    .section-content ul { padding-left: 18px; }
+    .section-content li { margin-bottom: 5px; color: #ccc; font-size: 13.5px; }
+    .section-content strong { color: var(--text); }
+    .section-content code {
+      font-family: var(--mono); font-size: 12px;
+      background: var(--surface2); padding: 1px 5px;
+      border-radius: 3px; color: var(--gold);
+    }
+    .section-content em { color: var(--muted); font-style: italic; }
+
+    /* ── Trade cards with TV chart ────────────────────────────── */
+    .trade-block {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .trade-block:last-child { margin-bottom: 0; }
+    .trade-body { padding: 14px 16px; }
+
+    .tv-chart-wrap {
+      border-top: 1px solid var(--border);
+      height: 220px;
+      overflow: hidden;
+    }
+    .tv-chart-wrap .tradingview-widget-container,
+    .tv-chart-wrap .tradingview-widget-container__widget {
+      width: 100% !important;
+      height: 220px !important;
+    }
+
+    /* ── Sector snapshots grid ────────────────────────────────── */
+    .snapshots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .snapshot-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+    }
+    .snapshot-sector {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+    }
+    .snapshot-text { font-size: 12.5px; color: #ccc; line-height: 1.55; }
+
+    /* ── Scorecard ────────────────────────────────────────────── */
+    .scorecard-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-family: var(--mono); }
+    .scorecard-table th {
+      text-align: left; color: var(--muted); font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 6px 8px; border-bottom: 1px solid var(--border);
+    }
+    .scorecard-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+    .scorecard-table tr:last-child td { border-bottom: none; }
+    .pnl-pos { color: var(--green); }
+    .pnl-neg { color: var(--red); }
+    .pnl-pending { color: var(--muted); font-style: italic; }
+
+    /* ── Empty state ──────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state-icon { font-size: 36px; margin-bottom: 14px; }
+    .empty-state-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+
+    /* ── History ──────────────────────────────────────────────── */
+    .history-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .history-item:hover { border-color: var(--gold-dim); }
+    .history-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .history-date { font-family: var(--mono); font-size: 12px; color: var(--text); }
+    .history-picks { font-size: 12px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+    .pick-ticker {
+      display: inline-block; padding: 2px 7px; background: var(--surface2);
+      border-radius: 3px; margin-right: 5px; color: var(--text);
+    }
+    .history-detail { display: none; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .history-detail.open { display: block; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div class="logo">
+    <div class="logo-title">&#9646; AlphaSheet</div>
+    <div class="logo-sub">Global Trading Intelligence</div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tab-newsletter" onclick="switchTab('newsletter')">Newsletter</button>
+      <button class="nav-tab"        id="tab-history"    onclick="switchTab('history')">History</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="sidebar-label">Global Indices</div>
+    <div class="index-list" id="index-list">
+      <div class="index-row"><span class="index-name">Loading…</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div id="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Ready</span>
+    </div>
+    <button id="generate-btn" onclick="startGeneration()">Generate Newsletter</button>
+  </div>
+</aside>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────── -->
+<main id="main">
+  <div class="page active" id="page-newsletter">
+    <div id="newsletter-container">
+      <div class="empty-state">
+        <div class="empty-state-icon">&#9664;</div>
+        <div class="empty-state-title">No newsletter yet</div>
+        <p>Click <strong>Generate Newsletter</strong> to run the full pipeline.<br>Claude will search the web and surface today's best hidden-gem opportunities.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-history">
+    <div id="history-container">
+      <div class="empty-state">
+        <div class="empty-state-icon">&#9632;</div>
+        <div class="empty-state-title">No history yet</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'history') loadHistory();
+}
+
+// ── Generation ─────────────────────────────────────────────────────────────
+let pollingTimer = null;
+
+function startGeneration() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  setStatus('running', 'Starting pipeline…');
+
+  fetch('/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('error', data.error); btn.disabled = false; }
+      else { if (pollingTimer) clearInterval(pollingTimer); pollingTimer = setInterval(pollStatus, 1500); }
+    })
+    .catch(err => { setStatus('error', 'Network error: ' + err.message); btn.disabled = false; });
+}
+
+function pollStatus() {
+  fetch('/status').then(r => r.json()).then(state => {
+    if (state.error) {
+      clearInterval(pollingTimer);
+      setStatus('error', 'Error: ' + state.error);
+      document.getElementById('generate-btn').disabled = false;
+    } else if (state.running) {
+      setStatus('running', state.step || 'Working…');
+    } else if (state.done) {
+      clearInterval(pollingTimer);
+      setStatus('done', 'Newsletter ready');
+      document.getElementById('generate-btn').disabled = false;
+      loadLatestNewsletter();
+    }
+  }).catch(() => {});
+}
+
+function setStatus(state, text) {
+  document.getElementById('status-dot').className = 'status-dot ' + state;
+  document.getElementById('status-text').textContent = text;
+}
+
+// ── Index ticker sidebar ───────────────────────────────────────────────────
+function loadIndexList() {
+  fetch('/latest').then(r => r.json()).then(data => {
+    // We don't expose index data from /latest, so just show a note
+    // Indices are shown in the newsletter itself
+  });
+  // Show static labels — actual prices are in the newsletter
+  const indices = ['DAX','FTSE 100','CAC 40','S&P 500','NASDAQ','Nikkei','Hang Seng','Shanghai','KOSPI','ASX 200'];
+  const el = document.getElementById('index-list');
+  el.innerHTML = indices.map(n =>
+    `<div class="index-row"><span class="index-name">${n}</span><span class="index-change flat">—</span></div>`
+  ).join('');
+}
+
+// ── TradingView ticker mapping ─────────────────────────────────────────────
+function toTVSymbol(ticker) {
+  const map = {
+    '^GDAXI':'FOREXCOM:GRXEUR', '^FTSE':'SPREADEX:FTSE', '^FCHI':'EURONEXT:PX1',
+    '^GSPC':'SP:SPX', '^IXIC':'NASDAQ:IXIC', '^N225':'TVC:NI225',
+    '^HSI':'TVC:HSI', '000001.SS':'SSE:000001', '^KS11':'KRX:KOSPI', '^AXJO':'ASX:XJO',
+    'TSM':'NYSE:TSM','NVDA':'NASDAQ:NVDA','MSFT':'NASDAQ:MSFT','AAPL':'NASDAQ:AAPL',
+    'GOOGL':'NASDAQ:GOOGL','META':'NASDAQ:META','ASML':'NASDAQ:ASML',
+    'XOM':'NYSE:XOM','BABA':'NYSE:BABA','AMZN':'NASDAQ:AMZN',
+  };
+  if (map[ticker]) return map[ticker];
+  if (ticker.endsWith('.DE'))  return 'XETRA:'    + ticker.slice(0,-3);
+  if (ticker.endsWith('.L'))   return 'LSE:'       + ticker.slice(0,-2);
+  if (ticker.endsWith('.PA'))  return 'EURONEXT:'  + ticker.slice(0,-3);
+  if (ticker.endsWith('.SW'))  return 'SIX:'       + ticker.slice(0,-3);
+  if (ticker.endsWith('.T'))   return 'TSE:'       + ticker.slice(0,-2);
+  if (ticker.endsWith('.HK'))  return 'HKEX:'      + ticker.slice(0,-3);
+  if (ticker.endsWith('.TW'))  return 'TWSE:'      + ticker.slice(0,-3);
+  if (ticker.endsWith('.AX'))  return 'ASX:'       + ticker.slice(0,-3);
+  if (ticker.endsWith('.KS'))  return 'KRX:'       + ticker.slice(0,-3);
+  return 'NASDAQ:' + ticker;
+}
+
+function buildTVWidget(ticker) {
+  const symbol = toTVSymbol(ticker);
+  const id = 'tv_' + ticker.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now();
+  return `<div class="tv-chart-wrap">
+    <div class="tradingview-widget-container" id="${id}">
+      <div class="tradingview-widget-container__widget"></div>
+    </div>
+    <script>
+    (function(){
+      var cfg=${JSON.stringify({"symbol":symbol,"width":"100%","height":220,"locale":"en","dateRange":"1M","colorTheme":"dark","isTransparent":true,"autosize":true})};
+      var s=document.createElement('script');
+      s.src='https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+      s.async=true;
+      s.textContent=JSON.stringify(cfg);
+      document.getElementById(${JSON.stringify(id)}).querySelector('.tradingview-widget-container__widget').parentNode.appendChild(s);
+    })();
+    <\/script>
+  </div>`;
+}
+
+// ── Newsletter rendering ───────────────────────────────────────────────────
+function loadLatestNewsletter() {
+  fetch('/latest').then(r => r.json()).then(data => {
+    if (data.newsletter) renderNewsletter(data.newsletter);
+  });
+}
+
+function renderNewsletter(n) {
+  const container = document.getElementById('newsletter-container');
+  const sentiment = (n.sentiment || 'NEUTRAL').toUpperCase();
+  const sections  = parseNewsletterSections(n.content || '');
+
+  let html = `<div class="newsletter-header">
+    <span class="newsletter-meta">${formatDate(n.created_at)}</span>
+    <span class="sentiment-badge ${sentiment}">${sentiment}</span>
+  </div>`;
+
+  if (n.picks && n.picks.some(p => p.scored_at))
+    html += buildScorecardCard(n.picks.filter(p => p.scored_at));
+
+  if (sections.macro)
+    html += card('macro', 'Macro Pulse', markdownToHtml(sections.macro));
+
+  if (sections.catalyst)
+    html += card('catalyst', '48-Hour Catalyst Calendar', markdownToHtml(sections.catalyst));
+
+  if (sections.trades)
+    html += `<div class="section-card trades"><div class="section-tag">High-Conviction Trades</div>${buildTradeCards(sections.trades)}</div>`;
+
+  if (sections.snapshots)
+    html += `<div class="section-card snapshots"><div class="section-tag">Sector Snapshots</div>${buildSnapshotsGrid(sections.snapshots)}</div>`;
+
+  if (sections.contra)
+    html += card('contra', 'Contradiction Check', markdownToHtml(sections.contra));
+
+  if (!Object.values(sections).some(Boolean))
+    html += card('', '', markdownToHtml(n.content || ''));
+
+  container.innerHTML = html;
+}
+
+function card(cls, tag, bodyHtml) {
+  return `<div class="section-card ${cls}"><div class="section-tag">${tag}</div><div class="section-content">${bodyHtml}</div></div>`;
+}
+
+// ── Trade cards ────────────────────────────────────────────────────────────
+function buildTradeCards(tradesText) {
+  const blocks = tradesText.split(/(?=\*\*Trade\s+\d+:)/i).filter(b => b.trim());
+  if (!blocks.length) return `<div class="section-content">${markdownToHtml(tradesText)}</div>`;
+
+  return blocks.map(block => {
+    const m = block.match(/\*\*Trade\s+\d+:\s*[^\(]*\(([^\)]+)\)\*\*/i);
+    const ticker = m ? m[1].trim() : null;
+    return `<div class="trade-block">
+      <div class="trade-body section-content">${markdownToHtml(block)}</div>
+      ${ticker ? buildTVWidget(ticker) : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Sector snapshots grid ──────────────────────────────────────────────────
+function buildSnapshotsGrid(text) {
+  const sectors = [
+    'Defense & Aerospace','Tech & AI Infra','Industrials & Automation',
+    'Energy & Commodities','Banks & Financials','Consumer & Retail',
+  ];
+  const items = sectors.map(sector => {
+    const esc = sector.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/&/g,'(?:&amp;|&)');
+    const re  = new RegExp(`\\*{1,2}${esc}\\*{0,2}:?\\s*([\\s\\S]*?)(?=\\*{1,2}(?:${
+      sectors.map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/&/g,'(?:&amp;|&)')).join('|')
+    })|$)`, 'i');
+    const m = text.match(re);
+    return { sector, text: m ? m[1].trim() : '' };
+  });
+
+  if (!items.some(i => i.text))
+    return `<div class="section-content">${markdownToHtml(text)}</div>`;
+
+  return `<div class="snapshots-grid">${items.map(({sector,text}) =>
+    `<div class="snapshot-item">
+      <div class="snapshot-sector">${escHtml(sector)}</div>
+      <div class="snapshot-text">${markdownToHtml(text)}</div>
+    </div>`).join('')}</div>`;
+}
+
+// ── Scorecard ──────────────────────────────────────────────────────────────
+function buildScorecardCard(picks) {
+  const rows = picks.map(p => {
+    const pnl = p.pnl_pct;
+    const cls = pnl===null?'pnl-pending':(pnl>=0?'pnl-pos':'pnl-neg');
+    const str = pnl===null?'Pending':((pnl>=0?'+':'')+pnl.toFixed(2)+'%');
+    return `<tr><td>${escHtml(p.company)}</td><td>${escHtml(p.ticker)}</td>
+      <td>${p.entry_price!=null?p.entry_price.toFixed(2):'—'}</td>
+      <td>${p.exit_price!=null?p.exit_price.toFixed(2):'—'}</td>
+      <td class="${cls}">${str}</td></tr>`;
+  }).join('');
+  return `<div class="section-card scorecard"><div class="section-tag">Last Newsletter Scorecard</div>
+    <table class="scorecard-table">
+      <thead><tr><th>Company</th><th>Ticker</th><th>Entry</th><th>Exit</th><th>P&amp;L</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+// ── Section parser ─────────────────────────────────────────────────────────
+function parseNewsletterSections(content) {
+  const result = {macro:'',catalyst:'',trades:'',snapshots:'',contra:''};
+  let current = null;
+  for (const line of content.split('\n')) {
+    const h = line.trim();
+    if      (/^##\s+The Macro Pulse/i.test(h))           current = 'macro';
+    else if (/^##\s+48.Hour Catalyst/i.test(h))          current = 'catalyst';
+    else if (/^##\s+The Watchlist/i.test(h))             current = 'trades';
+    else if (/^##\s+Sector Snapshots/i.test(h))          current = 'snapshots';
+    else if (/^##\s+Contradiction Check/i.test(h))       current = 'contra';
+    else if (/^##\s+Last Newsletter Scorecard/i.test(h)) current = null;
+    else if (h.startsWith('## '))                        current = null;
+    else if (current) result[current] += line + '\n';
+  }
+  return result;
+}
+
+// ── Markdown → HTML ────────────────────────────────────────────────────────
+function markdownToHtml(md) {
+  if (!md) return '';
+  let h = escHtml(md);
+  h = h.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  h = h.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  h = h.replace(/^# (.+)$/gm,'<h2>$1</h2>');
+  h = h.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+  h = h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  h = h.replace(/\*(.+?)\*/g,'<em>$1</em>');
+  h = h.replace(/`([^`]+)`/g,'<code>$1</code>');
+  h = h.replace(/^[ \t]*[-*]\s+(.+)$/gm,'<li>$1</li>');
+  h = h.replace(/(<li>.*?<\/li>)/gs, m=>'<ul>'+m+'</ul>');
+  h = h.replace(/<\/ul>\s*<ul>/g,'');
+  h = h.replace(/\n{2,}/g,'</p><p>');
+  h = '<p>'+h+'</p>';
+  ['h2','h3','ul','hr'].forEach(t=>{
+    h = h.replace(new RegExp(`<p>(<${t}>)`,'g'),'$1');
+    h = h.replace(new RegExp(`(</${t}>)<\\/p>`,'g'),'$1');
+  });
+  h = h.replace(/<p>\s*<\/p>/g,'');
+  h = h.replace(/([^>])\n([^<])/g,'$1<br>$2');
+  return h;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+function loadHistory() {
+  fetch('/history').then(r=>r.json()).then(data=>renderHistory(data.newsletters||[]));
+}
+
+function renderHistory(newsletters) {
+  const el = document.getElementById('history-container');
+  if (!newsletters.length) {
+    el.innerHTML='<div class="empty-state"><div class="empty-state-title">No history yet</div></div>';
+    return;
+  }
+  el.innerHTML = newsletters.map((n,i) => {
+    const s = (n.sentiment||'NEUTRAL').toUpperCase();
+    const picks = (n.picks||[]).map(p=>{
+      const pnl=p.pnl_pct, cls=pnl===null?'pnl-pending':(pnl>=0?'pnl-pos':'pnl-neg');
+      const str=pnl===null?'':` <span class="${cls}">${pnl>=0?'+':''}${pnl.toFixed(2)}%</span>`;
+      return `<span class="pick-ticker">${escHtml(p.ticker)}</span>${str}`;
+    }).join(' ');
+    return `<div class="history-item" onclick="toggleHistoryDetail(${i})">
+      <div class="history-item-header">
+        <span class="history-date">${formatDate(n.created_at)}</span>
+        <span class="sentiment-badge ${s}">${s}</span>
+      </div>
+      ${picks?`<div class="history-picks">${picks}</div>`:''}
+      <div class="history-detail" id="hd-${i}">
+        <div class="section-content">${markdownToHtml((n.content||'').slice(0,2000))}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleHistoryDetail(i) {
+  const el=document.getElementById('hd-'+i);
+  if(el) el.classList.toggle('open');
+}
+
+function formatDate(iso) {
+  if(!iso) return '';
+  try {
+    return new Date(iso+(iso.endsWith('Z')?'':'Z')).toLocaleString('en-GB',{
+      day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'
+    });
+  } catch { return iso; }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadIndexList();
+loadLatestNewsletter();
+</script>
+</body>
+</html>

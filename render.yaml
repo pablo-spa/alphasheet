@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: alphasheet
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false   # you enter this manually in the Render dashboard
+    disk:
+      name: data
+      mountPath: /opt/render/project/src
+      sizeGB: 1
