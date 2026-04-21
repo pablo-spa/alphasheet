@@ -48,10 +48,12 @@ Exactly 3 specific events today or tomorrow that will move markets:
 - **[EVENT NAME]** — [date/time + timezone] — [why it moves prices]
 
 ## The Watchlist — 3 High-Conviction Trades
-Find 3 stocks with a clear catalyst discovered via web search. Prioritise:
-- Under-covered names on LSE, XETRA, Euronext, TSE, HKEX, ASX, or mid-cap US
-- Names reacting to a fresh catalyst (earnings, upgrade, policy, M&A) that isn't yet widely priced in
-- Diverse geographies — do not pick 3 US stocks
+Find 3 stocks with a clear catalyst discovered via web search. STRICT RULE: only pick stocks available on Trading 212 — that means US (NYSE/NASDAQ), UK (LSE), or European (XETRA, Euronext) exchanges only. Do NOT pick stocks on ASX, TSE, HKEX, Korean, or Chinese exchanges — they are not tradeable on Trading 212.
+
+Prioritise:
+- Under-covered mid-caps on LSE, XETRA, or Euronext that are less followed than US names
+- Names reacting to a fresh catalyst (earnings, upgrade, policy, M&A) not yet widely priced in
+- Diverse geographies — do not pick 3 US stocks; aim for at least one European name
 
 **Trade 1: [COMPANY NAME] ([TICKER])**
 - **Catalyst:** [specific news + source]
