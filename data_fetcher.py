@@ -20,7 +20,7 @@ def fetch_market_data():
     return data
 
 
-def fetch_news_headlines(max_per_ticker=3, max_total=30):
+def fetch_news_headlines(max_per_ticker=3, max_total=20):
     """Fetch recent financial headlines via yfinance — free, no API key needed."""
     seen = set()
     headlines = []

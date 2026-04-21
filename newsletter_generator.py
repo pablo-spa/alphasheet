@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import logging
 from datetime import datetime
 
@@ -111,29 +112,39 @@ def generate_newsletter(market_data_text, headlines_text, scorecard_text=""):
         "Based on the index data and headlines above, write the full newsletter now."
     )
 
-    logger.info("Calling Claude API (claude-sonnet-4-5, prompt caching enabled) …")
-    response = client.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=3000,
-        temperature=0.1,
-        system=[
-            {
-                "type": "text",
-                "text": build_system_prompt(),
-                "cache_control": {"type": "ephemeral"},  # cache the static system prompt
-            }
-        ],
-        messages=[{"role": "user", "content": user_message}],
-    )
+    last_error = None
+    for attempt in range(3):
+        try:
+            logger.info(f"Calling Claude API (attempt {attempt + 1}/3) …")
+            response = client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=3000,
+                temperature=0.1,
+                system=[
+                    {
+                        "type": "text",
+                        "text": build_system_prompt(),
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[{"role": "user", "content": user_message}],
+            )
+            cache_hit = getattr(response.usage, "cache_read_input_tokens", 0)
+            logger.info(f"Cache read: {cache_hit} tokens | Total input: {response.usage.input_tokens}")
 
-    cache_info = getattr(response.usage, "cache_read_input_tokens", 0)
-    logger.info(f"Cache read tokens: {cache_info} | Total input: {response.usage.input_tokens}")
+            content_parts = [
+                block.text for block in response.content
+                if hasattr(block, "type") and block.type == "text"
+            ]
+            full_content = "\n".join(content_parts).strip()
+            if not full_content:
+                raise RuntimeError("Claude returned an empty response.")
+            return full_content
 
-    content_parts = [
-        block.text for block in response.content
-        if hasattr(block, "type") and block.type == "text"
-    ]
-    full_content = "\n".join(content_parts).strip()
-    if not full_content:
-        raise RuntimeError("Claude returned an empty response.")
-    return full_content
+        except anthropic.RateLimitError as e:
+            last_error = e
+            wait = 60 * (attempt + 1)
+            logger.warning(f"Rate limit hit — waiting {wait}s before retry …")
+            time.sleep(wait)
+
+    raise RuntimeError(f"Rate limit exceeded after 3 attempts: {last_error}")
