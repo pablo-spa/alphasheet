@@ -6,7 +6,7 @@ from datetime import datetime
 import yfinance as yf
 from flask import Flask, jsonify, render_template, request
 
-from data_fetcher import fetch_market_data, format_market_data_for_prompt
+from data_fetcher import fetch_market_data, fetch_news_headlines, format_market_data_for_prompt, format_headlines_for_prompt
 from database import (
     get_last_scored_picks,
     get_latest_newsletter,
@@ -77,11 +77,16 @@ def run_pipeline():
         market_data = fetch_market_data()
         market_data_text = format_market_data_for_prompt(market_data)
 
+        _set_state("Fetching news headlines…")
+        headlines = fetch_news_headlines()
+        headlines_text = format_headlines_for_prompt(headlines)
+        logger.info(f"Fetched {len(headlines)} headlines")
+
         _set_state("Preparing scorecard…")
         scorecard_text = _build_scorecard_text(get_last_scored_picks())
 
-        _set_state("Calling Claude API (searching for hidden gems + writing newsletter)…")
-        content = generate_newsletter(market_data_text, scorecard_text)
+        _set_state("Calling Claude API (generating newsletter)…")
+        content = generate_newsletter(market_data_text, headlines_text, scorecard_text)
 
         _set_state("Saving newsletter…")
         sentiment = extract_sentiment(content)

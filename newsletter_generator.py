@@ -19,46 +19,40 @@ SECTORS = [
 ]
 
 
-def build_system_prompt(scorecard_text=""):
-    today = datetime.now().strftime("%A, %B %d, %Y")
-    scorecard_section = ""
-    if scorecard_text:
-        scorecard_section = f"\nSCORECARD FROM PREVIOUS NEWSLETTER:\n{scorecard_text}\n"
-
+def build_system_prompt():
+    """Static portion of the prompt — eligible for prompt caching."""
     sectors_list = "\n".join(f"- {s}" for s in SECTORS)
+    return f"""You are a global equity analyst writing a daily trading newsletter covering European and US equities.
 
-    return f"""You are a global equity analyst writing a daily trading newsletter. Today is {today}.
+Your edge is finding stocks that are NOT in the mainstream conversation — overlooked mid-caps, under-covered names on LSE, XETRA, or Euronext, companies benefiting from a structural shift before the crowd notices.
 
-Your edge is finding stocks that are NOT in the mainstream conversation — overlooked mid-caps, under-covered names on European or Asian exchanges, companies benefiting from a structural shift before the crowd notices. Avoid obvious mega-caps unless the catalyst is genuinely exceptional and non-consensus.
+IMPORTANT CONSTRAINT: Only recommend stocks available on Trading 212 — US (NYSE/NASDAQ), UK (LSE), and European (XETRA, Euronext) exchanges only. Do NOT pick ASX, TSE, HKEX, Korean, or Chinese stocks.
 
-IMPORTANT: Use web_search extensively — search for today's earnings surprises, analyst upgrades, unusual volume, M&A rumors, policy shifts, and macro catalysts. Prioritise fresh, actionable intelligence over well-known narratives.
+You will be given:
+1. Live index prices (verified facts — do not contradict)
+2. Today's market headlines fetched from financial news feeds
 
-Markets macro context: DAX, FTSE 100, CAC 40, S&P 500, NASDAQ, Nikkei 225, Hang Seng, Shanghai, KOSPI, ASX 200.
-{scorecard_section}
+Use the provided headlines as your primary news source. Base all catalyst claims on the headlines given — do not invent news.
+
 Produce EXACTLY these sections with EXACTLY these markdown headers:
 
 ## The Macro Pulse
-3 sentences covering global sentiment today — include Western and Asian dynamics. End with exactly one of:
+3 sentences on today's global market sentiment based on the headlines and index moves provided. End with exactly one of:
 **SENTIMENT: BULLISH**
 **SENTIMENT: BEARISH**
 **SENTIMENT: NEUTRAL**
 
 ## 48-Hour Catalyst Calendar
-Exactly 3 specific events today or tomorrow that will move markets:
-- **[EVENT NAME]** — [date/time + timezone] — [why it moves prices]
+Exactly 3 specific events from the headlines happening today or tomorrow that will move markets:
+- **[EVENT NAME]** — [date/time + timezone if known] — [why it moves prices]
 
 ## The Watchlist — 3 High-Conviction Trades
-Find 3 stocks with a clear catalyst discovered via web search. STRICT RULE: only pick stocks available on Trading 212 — that means US (NYSE/NASDAQ), UK (LSE), or European (XETRA, Euronext) exchanges only. Do NOT pick stocks on ASX, TSE, HKEX, Korean, or Chinese exchanges — they are not tradeable on Trading 212.
-
-Prioritise:
-- Under-covered mid-caps on LSE, XETRA, or Euronext that are less followed than US names
-- Names reacting to a fresh catalyst (earnings, upgrade, policy, M&A) not yet widely priced in
-- Diverse geographies — do not pick 3 US stocks; aim for at least one European name
+Find 3 stocks with a clear catalyst from the headlines provided. STRICT: only NYSE/NASDAQ, LSE, XETRA, or Euronext. Aim for at least one European name. Prioritise under-covered mid-caps over mega-caps.
 
 **Trade 1: [COMPANY NAME] ([TICKER])**
-- **Catalyst:** [specific news + source]
+- **Catalyst:** [specific news from the headlines provided]
 - **The Play:** [long or short, thesis in one sentence]
-- **Entry Zone:** [price range with current price context]
+- **Entry Zone:** [price range with context]
 - **Upside Trigger:** [what confirms the trade]
 - **Confidence Score:** [X/10] — [one-line rationale]
 - **Risk:** [one specific downside scenario]
@@ -70,7 +64,7 @@ Prioritise:
 [same structure]
 
 ## Sector Snapshots
-For each sector below, write exactly 2 sentences: current momentum + the key catalyst or risk to watch. Name specific companies, events, or data points — no vague statements.
+For each sector below, write exactly 2 sentences: current momentum + the key catalyst or risk to watch. Reference specific companies or data points from the headlines.
 
 {sectors_list}
 
@@ -81,9 +75,9 @@ Format each as:
 Check each trade against the macro sentiment. Flag conflicts explicitly. If all align, write: "All trade ideas align with the macro sentiment."
 
 Rules:
-- No padding — every sentence must contain a specific, actionable insight
-- Anchor entry zones to real prices (use live index data as context; for individual stocks use web search to get current prices)
-- The best ideas are the ones other newsletters aren't writing about today"""
+- Every catalyst claim must reference the headlines provided — no invented news
+- Anchor entry zones to real prices where available
+- No padding — every sentence must contain a specific, actionable insight"""
 
 
 def extract_sentiment(content):
@@ -100,30 +94,40 @@ def extract_picks(content):
     return picks[:3]
 
 
-def generate_newsletter(market_data_text, scorecard_text=""):
+def generate_newsletter(market_data_text, headlines_text, scorecard_text=""):
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY is not set in the environment.")
 
     client = anthropic.Anthropic(api_key=api_key)
-    system_prompt = build_system_prompt(scorecard_text)
+
+    today = datetime.now().strftime("%A, %B %d, %Y")
+    scorecard_section = f"\nSCORECARD FROM PREVIOUS NEWSLETTER:\n{scorecard_text}\n" if scorecard_text else ""
 
     user_message = (
-        "Today's live index data — treat these as verified facts:\n\n"
+        f"Today is {today}.{scorecard_section}\n\n"
         f"{market_data_text}\n\n"
-        "Use web_search to find today's best overlooked opportunities, breaking news, and macro catalysts. "
-        "Then write the full newsletter. Prioritise non-obvious, under-covered stocks with fresh catalysts."
+        f"{headlines_text}\n\n"
+        "Based on the index data and headlines above, write the full newsletter now."
     )
 
-    logger.info("Calling Claude API (claude-sonnet-4-5) …")
+    logger.info("Calling Claude API (claude-sonnet-4-5, prompt caching enabled) …")
     response = client.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=4096,
+        max_tokens=3000,
         temperature=0.1,
-        system=system_prompt,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        system=[
+            {
+                "type": "text",
+                "text": build_system_prompt(),
+                "cache_control": {"type": "ephemeral"},  # cache the static system prompt
+            }
+        ],
         messages=[{"role": "user", "content": user_message}],
     )
+
+    cache_info = getattr(response.usage, "cache_read_input_tokens", 0)
+    logger.info(f"Cache read tokens: {cache_info} | Total input: {response.usage.input_tokens}")
 
     content_parts = [
         block.text for block in response.content
